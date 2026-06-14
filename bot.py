@@ -374,7 +374,6 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
     job = _inline_jobs.pop(chosen.result_id, None)
     if not job:
         log.warning("chosen_inline_result for unknown id %s (restart? gc?)", chosen.result_id)
-        # Fall back to chosen.query so we can still answer.
         if chosen.query:
             job = {"user_id": chosen.from_user.id, "query": chosen.query, "ts": time.time()}
         else:
@@ -395,7 +394,6 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
             pass
         return
 
-    # Inline mode uses the user's personal scope (no group history mixing).
     scope = storage.user_scope(user_id)
     entry = await storage.get_scope(scope)
     model = entry.get("model") or config.DEFAULT_MODEL
@@ -406,8 +404,6 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
     packed = api.build_message(user_text, history=history, system=system)
     header = f"<b>Q:</b> {user_text}\n\n"
 
-    # Collect the full reply without editing along the way; inline mode wants one
-    # clean swap from placeholder to final answer.
     buffer = ""
     errored: str | None = None
     try:
@@ -442,16 +438,14 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
             text=rendered[:4090],
         )
     except TelegramBadRequest:
-        # HTML rendering failed (rare — usually unclosed tag in streamed md).
-        # Fall back to plain text so the user still gets the answer.
         try:
             await bot.edit_message_text(
                 inline_message_id=inline_message_id,
                 text=(header + body)[:4090],
                 parse_mode=None,
             )
-        except TelegramBadRequest:
-            pass
+        except TelegramBadRequest as e:
+            log.error("Failed to edit inline message: %s", e)
 
     if buffer.strip() and not errored:
         await storage.append_history(scope, user_text, buffer.strip())
