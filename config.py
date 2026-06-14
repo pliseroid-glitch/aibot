@@ -5,6 +5,7 @@ API_KEY is your unlimited.surf API key.
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,6 +15,10 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 # unlimited.surf API key
 API_KEY = os.getenv("UNLIMITED_API_KEY")
+
+if not BOT_TOKEN:
+    print("FATAL: BOT_TOKEN env var is not set. Set it in .env or Railway Variables.", file=sys.stderr)
+    sys.exit(1)
 
 # API endpoints
 API_BASE = "https://unlimited.surf/api"

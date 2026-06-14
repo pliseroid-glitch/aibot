@@ -457,16 +457,7 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
         await storage.append_history(scope, user_text, buffer.strip())
 
 
-# In-memory map: inline result_id -> {user_id, query, ts}. GC'd opportunistically.
-_inline_jobs: dict[str, dict] = {}
 
-
-def _gc_inline_jobs() -> None:
-    """Drop entries older than 5 minutes so the dict can't grow unbounded."""
-    cutoff = time.time() - 300
-    stale = [k for k, v in _inline_jobs.items() if v.get("ts", 0) < cutoff]
-    for k in stale:
-        _inline_jobs.pop(k, None)
 
 
 # ---------- main chat handler ----------
