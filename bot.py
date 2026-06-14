@@ -352,6 +352,9 @@ async def on_inline(query: InlineQuery) -> None:
                 message_text=f"<b>Q:</b> {q}\n\n{_INLINE_PLACEHOLDER}",
                 parse_mode=ParseMode.HTML,
             ),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="⏳ thinking…", callback_data="noop")]
+            ]),
         )
     ]
     await query.answer(results, cache_time=0, is_personal=True)
@@ -425,6 +428,7 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
             await bot.edit_message_text(
                 inline_message_id=inline_message_id,
                 text=final_text[:4090],
+                reply_markup=None,
             )
         except TelegramBadRequest:
             pass
@@ -436,6 +440,7 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
         await bot.edit_message_text(
             inline_message_id=inline_message_id,
             text=rendered[:4090],
+            reply_markup=None,
         )
     except TelegramBadRequest:
         try:
@@ -443,6 +448,7 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
                 inline_message_id=inline_message_id,
                 text=(header + body)[:4090],
                 parse_mode=None,
+                reply_markup=None,
             )
         except TelegramBadRequest as e:
             log.error("Failed to edit inline message: %s", e)
