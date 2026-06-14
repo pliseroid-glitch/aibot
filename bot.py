@@ -359,15 +359,15 @@ async def on_inline(query: InlineQuery) -> None:
 
 @dp.chosen_inline_result()
 async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
-    log.info(
-        "chosen_inline_result from %s, result_id=%s, inline_message_id=%s, query=%r",
+    log.warning(
+        "CHOSEN_INLINE fired! user=%s result_id=%s inline_message_id=%r query=%r",
         chosen.from_user.id, chosen.result_id, chosen.inline_message_id, chosen.query,
     )
     inline_message_id = chosen.inline_message_id
     if not inline_message_id:
-        log.warning(
-            "No inline_message_id — Inline Feedback is not enabled in @BotFather. "
-            "Run /setinlinefeedback for the bot and pick 100%%."
+        log.error(
+            "inline_message_id is None! Set /setinlinefeedback to 100%% in @BotFather. "
+            "Current value: %s", chosen.inline_message_id,
         )
         return
 
