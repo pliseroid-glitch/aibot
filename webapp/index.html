@@ -99,7 +99,7 @@ textarea::placeholder{color:var(--text2)}
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
-const API='https://unlimited.surf/api';
+const API='';
 const TGM=Telegram.WebApp;
 TGM.ready();TGM.expand();
 
@@ -117,7 +117,7 @@ function init(){
 
 async function fetchModels(){
   try{
-    const r=await fetch('https://unlimited.surf/api/models');
+    const r=await fetch('/api/models');
     const d=await r.json();
     models=(d.data||[]).filter(m=>m.available!==false);
     models.sort((a,b)=>(a.provider||'').localeCompare(b.provider||'')||(a.name||'').localeCompare(b.name||''));
@@ -208,7 +208,7 @@ async function send(){
   let errored='';
 
   try{
-    const r=await fetch(API+'/chat',{
+    const r=await fetch('/api/chat',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({message:packed,model:selectedModel,effort:'medium'})

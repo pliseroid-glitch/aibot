@@ -45,7 +45,10 @@ from aiogram.types import (
     InlineQuery,
     InlineQueryResultArticle,
     InputTextMessageContent,
+    KeyboardButton,
     Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
     WebAppInfo,
 )
 
@@ -105,26 +108,15 @@ TIER_EMOJI = {
 }
 
 
-def main_menu_kb() -> InlineKeyboardMarkup:
+def main_menu_kb() -> ReplyKeyboardMarkup:
     rows = [
-        [
-            InlineKeyboardButton(text="\U0001F916 Модель", callback_data="menu:models"),
-            InlineKeyboardButton(text="\u26A1 Усиление", callback_data="menu:effort"),
-        ],
-        [
-            InlineKeyboardButton(text="\U0001F4CB Настройки", callback_data="menu:me"),
-            InlineKeyboardButton(text="\U0001F4CA Статистика", callback_data="menu:stats"),
-        ],
-        [
-            InlineKeyboardButton(text="\U0001F9F9 Новый чат", callback_data="menu:new"),
-            InlineKeyboardButton(text="\u2139\ufe0f Помощь", callback_data="menu:help"),
-        ],
+        [KeyboardButton(text="\U0001F916 Модель"), KeyboardButton(text="\u26A1 Усиление")],
+        [KeyboardButton(text="\U0001F4CB Настройки"), KeyboardButton(text="\U0001F4CA Статистика")],
+        [KeyboardButton(text="\U0001F9F9 Новый чат"), KeyboardButton(text="\u2139\ufe0f Помощь")],
     ]
     if config.WEBAPP_URL:
-        rows.insert(0, [
-            InlineKeyboardButton(text="\U0001F310 Открыть чат", web_app=WebAppInfo(url=config.WEBAPP_URL)),
-        ])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
+        rows.insert(0, [KeyboardButton(text="\U0001F310 Открыть чат", web_app=WebAppInfo(url=config.WEBAPP_URL))])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
 def provider_kb(providers: list[str]) -> InlineKeyboardMarkup:
@@ -320,95 +312,65 @@ async def cb_effort(cq: CallbackQuery) -> None:
     await cq.answer("Saved")
 
 
-# ---------- main menu callbacks ----------
+# ---------- reply keyboard button handlers ----------
 
-@dp.callback_query(F.data == "menu:models")
-async def cb_menu_models(cq: CallbackQuery) -> None:
-    try:
-        models = await fetch_models()
-    except Exception as e:
-        await cq.answer(f"Error: {e}", show_alert=True)
-        return
-    providers = sorted({m.get("provider", "other") for m in models})
-    await cq.message.edit_text("Choose provider:", reply_markup=provider_kb(providers))
-    await cq.answer()
+BUTTON_TEXTS = {
+    "\U0001F916 Модель": "models",
+    "\u26A1 Усиление": "effort",
+    "\U0001F4CB Настройки": "me",
+    "\U0001F4CA Статистика": "stats",
+    "\U0001F9F9 Новый чат": "new",
+    "\u2139\ufe0f Помощь": "help",
+}
 
 
-@dp.callback_query(F.data == "menu:effort")
-async def cb_menu_effort(cq: CallbackQuery) -> None:
-    await cq.message.edit_text("Choose reasoning effort:", reply_markup=effort_kb())
-    await cq.answer()
-
-
-@dp.callback_query(F.data == "menu:me")
-async def cb_menu_me(cq: CallbackQuery) -> None:
-    scope = (
-        storage.user_scope(cq.from_user.id)
-        if cq.message.chat.type == "private"
-        else storage.chat_scope(cq.message.chat.id)
-    )
-    entry = await storage.get_scope(scope)
-    model = entry.get("model") or config.DEFAULT_MODEL
-    effort = entry.get("effort") or config.DEFAULT_EFFORT
-    system = entry.get("system")
-    msg_count = entry.get("msg_count", 0)
-    hist = entry.get("history") or []
-    pairs = len(hist) // 2
-    sys_line = f"<code>{system[:200]}</code>" if system else "<i>(none)</i>"
-    text = (
-        f"<b>Model:</b> <code>{model}</code>\n"
-        f"<b>Effort:</b> {effort}\n"
-        f"<b>System prompt:</b> {sys_line}\n"
-        f"<b>History:</b> {pairs} turn(s)\n"
-        f"<b>Messages sent:</b> {msg_count}"
-    )
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="← Back", callback_data="menu:back")]
-    ])
-    await cq.message.edit_text(text, reply_markup=kb)
-    await cq.answer()
-
-
-@dp.callback_query(F.data == "menu:stats")
-async def cb_menu_stats(cq: CallbackQuery) -> None:
-    scope = (
-        storage.user_scope(cq.from_user.id)
-        if cq.message.chat.type == "private"
-        else storage.chat_scope(cq.message.chat.id)
-    )
-    entry = await storage.get_scope(scope)
-    msg_count = entry.get("msg_count", 0)
-    last_used = entry.get("last_used")
-    last_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(last_used)) if last_used else "never"
-    text = f"<b>Messages:</b> {msg_count}\n<b>Last used:</b> {last_str}"
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="← Back", callback_data="menu:back")]
-    ])
-    await cq.message.edit_text(text, reply_markup=kb)
-    await cq.answer()
-
-
-@dp.callback_query(F.data == "menu:new")
-async def cb_menu_new(cq: CallbackQuery) -> None:
-    scope = (
-        storage.user_scope(cq.from_user.id)
-        if cq.message.chat.type == "private"
-        else storage.chat_scope(cq.message.chat.id)
-    )
-    await storage.clear_history(scope)
-    await cq.answer("\U0001F9F9 History cleared!", show_alert=True)
-
-
-@dp.callback_query(F.data == "menu:help")
-async def cb_menu_help(cq: CallbackQuery) -> None:
-    await cq.message.edit_text(HELP_TEXT, reply_markup=main_menu_kb())
-    await cq.answer()
-
-
-@dp.callback_query(F.data == "menu:back")
-async def cb_menu_back(cq: CallbackQuery) -> None:
-    await cq.message.edit_text(HELP_TEXT, reply_markup=main_menu_kb())
-    await cq.answer()
+@dp.message(F.text.in_(BUTTON_TEXTS))
+async def on_button(message: Message) -> None:
+    action = BUTTON_TEXTS[message.text]
+    if action == "models":
+        try:
+            models = await fetch_models()
+        except Exception as e:
+            await message.answer(f"Couldn't load models: {e}", reply_markup=main_menu_kb())
+            return
+        providers = sorted({m.get("provider", "other") for m in models})
+        await message.answer("Choose provider:", reply_markup=provider_kb(providers))
+    elif action == "effort":
+        await message.answer("Choose reasoning effort:", reply_markup=effort_kb())
+    elif action == "me":
+        scope = scope_for_message(message)
+        entry = await storage.get_scope(scope)
+        model = entry.get("model") or config.DEFAULT_MODEL
+        effort = entry.get("effort") or config.DEFAULT_EFFORT
+        system = entry.get("system")
+        msg_count = entry.get("msg_count", 0)
+        hist = entry.get("history") or []
+        pairs = len(hist) // 2
+        sys_line = f"<code>{system[:200]}</code>" if system else "<i>(none)</i>"
+        await message.answer(
+            f"<b>Model:</b> <code>{model}</code>\n"
+            f"<b>Effort:</b> {effort}\n"
+            f"<b>System prompt:</b> {sys_line}\n"
+            f"<b>History:</b> {pairs} turn(s)\n"
+            f"<b>Messages sent:</b> {msg_count}",
+            reply_markup=main_menu_kb(),
+        )
+    elif action == "stats":
+        scope = scope_for_message(message)
+        entry = await storage.get_scope(scope)
+        msg_count = entry.get("msg_count", 0)
+        last_used = entry.get("last_used")
+        last_str = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(last_used)) if last_used else "never"
+        await message.answer(
+            f"<b>Messages:</b> {msg_count}\n<b>Last used:</b> {last_str}",
+            reply_markup=main_menu_kb(),
+        )
+    elif action == "new":
+        scope = scope_for_message(message)
+        await storage.clear_history(scope)
+        await message.answer("\U0001F9F9 History cleared.", reply_markup=main_menu_kb())
+    elif action == "help":
+        await message.answer(HELP_TEXT, reply_markup=main_menu_kb())
 
 
 # ---------- inline mode ----------
