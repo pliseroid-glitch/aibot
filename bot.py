@@ -46,6 +46,7 @@ from aiogram.types import (
     InlineQueryResultArticle,
     InputTextMessageContent,
     Message,
+    WebAppInfo,
 )
 
 import api
@@ -105,7 +106,7 @@ TIER_EMOJI = {
 
 
 def main_menu_kb() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
+    rows = [
         [
             InlineKeyboardButton(text="\U0001F916 Модель", callback_data="menu:models"),
             InlineKeyboardButton(text="\u26A1 Усиление", callback_data="menu:effort"),
@@ -118,7 +119,12 @@ def main_menu_kb() -> InlineKeyboardMarkup:
             InlineKeyboardButton(text="\U0001F9F9 Новый чат", callback_data="menu:new"),
             InlineKeyboardButton(text="\u2139\ufe0f Помощь", callback_data="menu:help"),
         ],
-    ])
+    ]
+    if config.WEBAPP_URL:
+        rows.insert(0, [
+            InlineKeyboardButton(text="\U0001F310 Открыть чат", web_app=WebAppInfo(url=config.WEBAPP_URL)),
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def provider_kb(providers: list[str]) -> InlineKeyboardMarkup:

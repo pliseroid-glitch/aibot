@@ -51,3 +51,6 @@ INLINE_MAX_RESULTS = 5
 
 # Inline cache timeout (seconds). Telegram clients won't re-query within this window.
 INLINE_CACHE_TIME = 0
+
+# Mini App URL (must be HTTPS). Host the webapp/ folder and set this.
+WEBAPP_URL = os.getenv("WEBAPP_URL", "")
