@@ -457,9 +457,14 @@ async def on_chosen_inline(chosen: ChosenInlineResult, bot: Bot) -> None:
         await storage.append_history(scope, user_text, buffer.strip())
 
 
+def _gc_inline_jobs() -> None:
+    cutoff = time.time() - 300
+    stale = [k for k, v in _inline_jobs.items() if v.get("ts", 0) < cutoff]
+    for k in stale:
+        _inline_jobs.pop(k, None)
 
 
-
+# ---------- main chat handler ----------
 # ---------- main chat handler ----------
 
 def should_handle_in_group(message: Message, bot_username: str) -> bool:
