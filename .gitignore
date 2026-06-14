@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+user_state.json
+*.stackdump
+.claude/
