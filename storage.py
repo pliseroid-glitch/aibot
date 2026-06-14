@@ -26,27 +26,29 @@ import time
 from collections import deque
 from typing import Any
 
+import aiofiles
+
 import config
 
 _lock = asyncio.Lock()
 
-HISTORY_MAX = 20  # how many message-pairs to keep per scope
+HISTORY_MAX = 20
 
 
-def _load() -> dict:
+async def _load() -> dict:
     if not os.path.exists(config.STATE_FILE):
         return {}
     try:
-        with open(config.STATE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        async with aiofiles.open(config.STATE_FILE, "r", encoding="utf-8") as f:
+            return json.loads(await f.read())
     except (json.JSONDecodeError, OSError):
         return {}
 
 
-def _save(data: dict) -> None:
+async def _save(data: dict) -> None:
     tmp = config.STATE_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    async with aiofiles.open(tmp, "w", encoding="utf-8") as f:
+        await f.write(json.dumps(data, ensure_ascii=False, indent=2))
     os.replace(tmp, config.STATE_FILE)
 
 
@@ -64,16 +66,16 @@ def chat_scope(chat_id: int) -> str:
 
 async def get_scope(scope: str) -> dict:
     async with _lock:
-        return _load().get(scope, {})
+        return (await _load()).get(scope, {})
 
 
 async def update_scope(scope: str, **fields: Any) -> dict:
     async with _lock:
-        data = _load()
+        data = await _load()
         entry = data.get(scope, {})
         entry.update(fields)
         data[scope] = entry
-        _save(data)
+        await _save(data)
         return entry
 
 
@@ -96,28 +98,27 @@ async def get_history(scope: str) -> list[dict]:
 async def append_history(scope: str, user_text: str, assistant_text: str) -> None:
     """Add one user/assistant pair; trim to HISTORY_MAX pairs."""
     async with _lock:
-        data = _load()
+        data = await _load()
         entry = data.get(scope, {})
         hist = list(entry.get("history") or [])
         hist.append({"role": "user", "content": user_text})
         hist.append({"role": "assistant", "content": assistant_text})
-        # Trim oldest first; *2 because each pair is two entries.
         if len(hist) > HISTORY_MAX * 2:
             hist = hist[-HISTORY_MAX * 2:]
         entry["history"] = hist
         entry["msg_count"] = entry.get("msg_count", 0) + 1
         entry["last_used"] = int(time.time())
         data[scope] = entry
-        _save(data)
+        await _save(data)
 
 
 async def clear_history(scope: str) -> None:
     async with _lock:
-        data = _load()
+        data = await _load()
         entry = data.get(scope, {})
         entry["history"] = []
         data[scope] = entry
-        _save(data)
+        await _save(data)
 
 
 # ----- in-memory rate limiter -----
@@ -127,12 +128,7 @@ _rate_lock = asyncio.Lock()
 
 
 async def check_rate(user_id: int) -> tuple[bool, int]:
-    """Return (allowed, seconds_until_next_slot).
-
-    Sliding window: at most RATE_LIMIT_PER_MIN requests in any 60 s window
-    per Telegram user. When denied, the second item tells the caller how
-    long until the oldest request in the window expires.
-    """
+    """Return (allowed, seconds_until_next_slot)."""
     now = time.monotonic()
     cutoff = now - 60.0
     async with _rate_lock:
